@@ -17,29 +17,53 @@ def onehot(data, n):
 
 
 class BagDataset(Dataset):
-    def __init__(self, transform=None):
+    def __init__(self, transform=None, train=True):
+        self.train = train
         self.transform = transform
 
     def __len__(self):
-        return len(os.listdir('last'))
+        if self.train is True:
+            return len(os.listdir('./Dataset/train/'))
+        else:
+            return len(os.listdir('./Dataset/test/'))
 
     def __getitem__(self, idx):
-        img_name = os.listdir('last')[idx]
-        imgA = cv2.imread('last/' + img_name)
-        imgA = cv2.resize(imgA, (160, 160))
-        imgB = cv2.imread('last_msk/' + img_name, 0)
-        imgB = cv2.resize(imgB, (160, 160))
-        imgB = imgB / 255
-        imgB = imgB.astype('uint8')
-        imgB = onehot(imgB, 2)
-        imgB = imgB.swapaxes(0, 2).swapaxes(1, 2)
-        imgB = torch.FloatTensor(imgB)
+        if self.train is True:
+            img_name = os.listdir('./Dataset/train/')[idx]
+            imgA = cv2.imread('./Dataset/train/' + img_name)
+            imgA = cv2.resize(imgA, (160, 160))
+            imgB = cv2.imread('./Dataset/train_mask/' + img_name, 0)
+            imgB = cv2.resize(imgB, (160, 160))
+            imgB = imgB / 255
+            imgB = imgB.astype('uint8')
+            imgB = onehot(imgB, 2)
+            imgB = imgB.swapaxes(0, 2).swapaxes(1, 2)
+            imgB = torch.FloatTensor(imgB)
 
-        if self.transform:
-            imgA = self.transform(imgA)
-        item = {'A': imgA, 'B': imgB}
-        return item
+            if self.transform:
+                imgA = self.transform(imgA)
+            item = {'A': imgA, 'B': imgB}
+            return item
+        else:
+            img_name = os.listdir('./Dataset/test/')[idx]
+            imgA = cv2.imread('./Dataset/test/' + img_name)
+            imgA = cv2.resize(imgA, (160, 160))
+            imgB = cv2.imread('./Dataset/test_mask/' + img_name, 0)
+            imgB = cv2.resize(imgB, (160, 160))
+            imgB = imgB / 255
+            imgB = imgB.astype('uint8')
+            imgB = onehot(imgB, 2)
+            imgB = imgB.swapaxes(0, 2).swapaxes(1, 2)
+            imgB = torch.FloatTensor(imgB)
+
+            if self.transform:
+                imgA = self.transform(imgA)
+            item = {'A': imgA, 'B': imgB}
+            return item
 
 
-bag = BagDataset(transform)
-dataloader = DataLoader(bag, batch_size=4, shuffle=True, num_workers=4)
+train_bag = BagDataset(transform, train=True)
+train_dataloader = DataLoader(train_bag, batch_size=4, shuffle=True, num_workers=4)
+
+test_bag = BagDataset(transform, train=False)
+test_dataloader = DataLoader(test_bag, batch_size=4, shuffle=True, num_workers=4)

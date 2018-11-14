@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import models
 from torchvision.models.vgg import VGG
-from BagData import dataloader
+from BagData import train_dataloader, test_dataloader
 import numpy as np
 from tensorboardX import SummaryWriter
 import torchvision.utils as vutils
@@ -146,10 +146,10 @@ if __name__ == "__main__":
         saving_index += 1
         index = 0
         epo_loss = 0
-        for item in dataloader:
+        for train in train_dataloader:
             index += 1
-            input = item['A']
-            y = item['B']
+            input = train['A']
+            y = train['B']
             input = torch.autograd.Variable(input)
             y = torch.autograd.Variable(y)
 
@@ -176,10 +176,30 @@ if __name__ == "__main__":
                 x = vutils.make_grid(connect_image, normalize=True)
                 writer.add_image('Label_Pred', x, show_index)
                 show_index += 1
-                print('epoch {}, {}/{}, loss is {}'.format(epo, index, len(dataloader), iter_loss))
 
-        print('epoch loss = %f' % (epo_loss / len(dataloader)))
-        writer.add_scalar('iter_loss', epo_loss / len(dataloader), epo)
+                test_total_loss = []
+
+                for test in test_dataloader:
+                    test_input = test['A']
+                    test_y = test['B']
+                    test_input = torch.autograd.Variable(test_input)
+                    test_y = torch.autograd.Variable(test_y)
+                    if use_gpu:
+                        test_input = test_input.cuda()
+                        test_y = test_y.cuda()
+
+                    test_output = fcn_model(test_input)
+                    test_output = torch.sigmoid(test_output)
+                    test_loss = criterion(test_output, test_y)
+                    test_loss = test_loss.item()
+                    test_total_loss.append(test_loss)
+
+                # print("Average test loss is", sum(test_total_loss) / len(test_total_loss))
+                print('epoch {}, {}/{}, loss is {}'.format(epo, index, len(train_dataloader), iter_loss),
+                      "Average test loss is", sum(test_total_loss) / len(test_total_loss))
+
+        print('epoch loss = %f' % (epo_loss / len(train_dataloader)))
+        writer.add_scalar('iter_loss', epo_loss / len(train_dataloader), epo)
 
         if np.mod(saving_index, 5) == 1:
             torch.save(fcn_model, 'checkpoints/fcn_model_{}.pt'.format(epo))
