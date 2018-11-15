@@ -12,6 +12,8 @@ import shutil
 
 epoch = 100
 use_gpu = True if torch.cuda.is_available() else False
+train_log = "./logs/train"
+test_log = "./logs/test"
 
 
 class FCNs(nn.Module):
@@ -121,16 +123,17 @@ if __name__ == "__main__":
 
     os.mkdir("./checkpoints")
 
-    if os.path.exists("./runs") is True:  # delete the former TensorBoard info
-        shutil.rmtree("./runs")
+    if os.path.exists("./logs") is True:  # delete the former TensorBoard info
+        shutil.rmtree("./logs")
 
     vgg_model = VGGNet(requires_grad=True)
     fcn_model = FCNs(pretrained_net=vgg_model, n_class=2)
 
     dummy_input = torch.Tensor(4, 3, 160, 160)
 
-    writer = SummaryWriter()
-    writer.add_graph(fcn_model, dummy_input)
+    train_writer = SummaryWriter(log_dir=train_log)
+    train_writer.add_graph(fcn_model, dummy_input)
+    test_writer = SummaryWriter(log_dir=test_log)
 
     if use_gpu:
         fcn_model = fcn_model.cuda()
@@ -174,32 +177,31 @@ if __name__ == "__main__":
                 connect_image = np.concatenate((y_np[:, None, :, :], output_np[:, None, :, :]))
                 connect_image = torch.from_numpy(connect_image)
                 x = vutils.make_grid(connect_image, normalize=True)
-                writer.add_image('Label_Pred', x, show_index)
+                train_writer.add_image('Label_Pred', x, show_index)
                 show_index += 1
+                print('epoch {}, {}/{}, loss is {}'.format(epo, index, len(train_dataloader), iter_loss))
 
-                test_total_loss = []
+        test_total_loss = []
 
-                for test in test_dataloader:
-                    test_input = test['A']
-                    test_y = test['B']
-                    test_input = torch.autograd.Variable(test_input)
-                    test_y = torch.autograd.Variable(test_y)
-                    if use_gpu:
-                        test_input = test_input.cuda()
-                        test_y = test_y.cuda()
+        for test in test_dataloader:
+            test_input = test['A']
+            test_y = test['B']
+            test_input = torch.autograd.Variable(test_input)
+            test_y = torch.autograd.Variable(test_y)
+            if use_gpu:
+                test_input = test_input.cuda()
+                test_y = test_y.cuda()
 
-                    test_output = fcn_model(test_input)
-                    test_output = torch.sigmoid(test_output)
-                    test_loss = criterion(test_output, test_y)
-                    test_loss = test_loss.item()
-                    test_total_loss.append(test_loss)
-
-                # print("Average test loss is", sum(test_total_loss) / len(test_total_loss))
-                print('epoch {}, {}/{}, loss is {}'.format(epo, index, len(train_dataloader), iter_loss),
-                      "Average test loss is", sum(test_total_loss) / len(test_total_loss))
+            test_output = fcn_model(test_input)
+            test_output = torch.sigmoid(test_output)
+            test_loss = criterion(test_output, test_y)
+            test_loss = test_loss.item()
+            test_total_loss.append(test_loss)
 
         print('epoch loss = %f' % (epo_loss / len(train_dataloader)))
-        writer.add_scalar('iter_loss', epo_loss / len(train_dataloader), epo)
+        print("test loss = %f" % (sum(test_total_loss) / len(test_total_loss)))
+        train_writer.add_scalar('iter_loss', epo_loss / len(train_dataloader), epo)
+        test_writer.add_scalar('iter_loss', sum(test_total_loss) / len(test_total_loss), epo)
 
         if np.mod(saving_index, 5) == 1:
             torch.save(fcn_model, 'checkpoints/fcn_model_{}.pt'.format(epo))
