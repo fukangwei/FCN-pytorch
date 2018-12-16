@@ -146,6 +146,7 @@ if __name__ == "__main__":
     show_index = 0
 
     for epo in range(epoch):
+        fcn_model.train()
         saving_index += 1
         index = 0
         epo_loss = 0
@@ -181,8 +182,8 @@ if __name__ == "__main__":
                 show_index += 1
                 print('epoch {}, {}/{}, loss is {}'.format(epo, index, len(train_dataloader), iter_loss))
 
+        fcn_model.eval()
         test_total_loss = []
-
         for test in test_dataloader:
             test_input = test['A']
             test_y = test['B']
